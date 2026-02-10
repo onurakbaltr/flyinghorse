@@ -1,14 +1,16 @@
 /* ============================================ 
-   Physics Darts 10.0 (Mobile Touch Fix)
+   Physics Darts 11.0 (Geometry Fix + Mobile)
    Features: 
-   - Mobile Touch Events (Start/Move/End)
-   - Touch-Action: None (Prevents Scroll)
+   - SEAMLESS Arrow Geometry (Fixed Transformations)
+   - Mobile Touch Support
    - Camera Zoom & Accurate Scoring
    - Native Forward Geometry (-Z)
    ============================================ */
 
 window.initDartsGame = function (container) {
-    console.log("Dart Game Initialized - v10 (Mobile Fix)");
+    // Safety: Stop previous loop if persistent
+    if (window.dartAnimId) cancelAnimationFrame(window.dartAnimId);
+    console.log("Dart Game Initialized - v11 (Geo Fix)");
 
     container.innerHTML = `
         <div id="darts-overlay" style="position:absolute; inset:0; pointer-events:none; z-index:10; font-family:'Outfit', sans-serif;">
@@ -29,7 +31,7 @@ window.initDartsGame = function (container) {
                 background: linear-gradient(to bottom, #fff, #bbb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
                 transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div>
         </div>
-        <div id="canvas-container" style="width:100%; height:100%; cursor:grab; background:#050505; touch-action: none;"></div>
+        <div id="canvas-container" style="width:100%; height:100%; cursor:grab; background:#050302; touch-action: none;"></div>
     `;
 
     const canvasContainer = document.getElementById('canvas-container');
@@ -39,7 +41,7 @@ window.initDartsGame = function (container) {
     // SCENE
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050302);
-    scene.fog = new THREE.Fog(0x050302, 20, 100);
+    scene.fog = new THREE.Fog(0x050302, 20, 150);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
     const CAM_START = new THREE.Vector3(0, 0, 55);
@@ -111,15 +113,70 @@ window.initDartsGame = function (container) {
     const board = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 0.5, 64), new THREE.MeshStandardMaterial({ map: createBoardTex(), roughness: 0.5 }));
     board.rotation.x = Math.PI / 2; board.receiveShadow = true; scene.add(board);
 
-    // DART
+    // --- SEAMLESS DART GEOMETRY ---
     const dartPivot = new THREE.Group(); scene.add(dartPivot);
     const dartModel = new THREE.Group();
-    // Tip -Z
-    dartModel.add(new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x999, metalness: 1 })).rotateX(-Math.PI / 2).translateZ(-2.5));
-    dartModel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 2.5, 12), new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.4 })).rotateX(-Math.PI / 2).translateZ(-0.5));
-    dartModel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2, 8), new THREE.MeshStandardMaterial({ color: 0xeee })).rotateX(-Math.PI / 2).translateZ(1.75));
-    const fMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }); const fGeo = new THREE.BoxGeometry(0.02, 1.5, 1.8);
-    dartModel.add(new THREE.Mesh(fGeo, fMat).translateZ(2.8)); dartModel.add(new THREE.Mesh(fGeo, fMat).rotateZ(Math.PI / 2).translateZ(2.8));
+
+    // Material
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.2 });
+    const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
+
+    // 1. Tip (Cone)
+    // Height 0.6. Base 0.06.
+    // Point at -Z.
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.6, 16), metalMat);
+    tip.rotation.x = -Math.PI / 2;
+    tip.position.z = -1.3; // Center of tip. Point is at -1.3 - 0.3 = -1.6. Base at -1.0.
+    dartModel.add(tip);
+
+    // 2. Shaft (Cylinder)
+    // Radius 0.06 (Seamless). Height 2.0.
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.0, 16), blackMat);
+    shaft.rotation.x = -Math.PI / 2;
+    shaft.position.z = 0.0; // From -1.0 to +1.0. Matches Tip Base.
+    dartModel.add(shaft);
+
+    // 3. Fletching Holder (Cylinder)
+    // Slightly thicker. Radius 0.07. Height 0.4.
+    const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 16), metalMat);
+    holder.rotation.x = -Math.PI / 2;
+    holder.position.z = 1.2; // From 1.0 to 1.4. Matches Shaft End.
+    dartModel.add(holder);
+
+    // 4. Flights
+    // Start at 1.4. Length 0.8.
+    const fMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+    const fGeo = new THREE.BoxGeometry(0.02, 1.2, 1.2); // Thin box
+
+    const f1 = new THREE.Mesh(fGeo, fMat);
+    f1.position.z = 1.6; // Center. (Range 1.0 to 2.2 approx) overlap holder slightly
+    // Box default length is Y. rotate X to Z? No box is 1.2 in Y.
+    // We want 1.2 length along Z.
+    // Geometry is X,Y,Z. Box(t, w, L).
+    // Let's use Plane or Box. Stick with Box.
+    // Box(0.02, 1.0, 1.0).
+    // Better: PlaneGeometry(1.0, 1.0)
+    // Let's stick to Box for volume.
+    // We want it aligned to Z. 
+    // Rotate 90 X?
+    // Geometry args: Width, Height, Depth.
+    // Box (0.02, 1.0, 1.0).
+    // Height is Y. We want Y to be the "Wing Span".
+    // Depth is Z. We want Z to be length.
+    // So Box(0.02, 1.5, 1.5).
+    // Span 1.5. Length 1.5. Thickness 0.02.
+    // Position z center.
+
+    const fGeoNew = new THREE.BoxGeometry(0.02, 1.2, 1.0); // 1.2 Span, 1.0 Length (Z)
+    const flight1 = new THREE.Mesh(fGeoNew, fMat);
+    flight1.position.z = 1.6; // Center at 1.6. Ends at 1.6+0.5=2.1.
+    dartModel.add(flight1);
+
+    const flight2 = new THREE.Mesh(fGeoNew, fMat);
+    flight2.rotation.z = Math.PI / 2;
+    flight2.position.z = 1.6;
+    dartModel.add(flight2);
+
     dartPivot.add(dartModel);
 
     // LOGIC
@@ -178,33 +235,18 @@ window.initDartsGame = function (container) {
 
     function handleEnd(currentY) {
         if (state.phase !== 'aiming') return;
-        // Check throw or cancel
         if ((currentY - dragStart.y) < 20) { resetTurn(); return; }
         throwDart();
     }
 
-    // MOUSE EVENTS
+    // EVENTS (MOUSE + TOUCH)
     container.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
     container.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
     container.addEventListener('mouseup', e => handleEnd(e.clientY));
 
-    // TOUCH EVENTS (Passive: false required to use preventDefault)
-    container.addEventListener('touchstart', e => {
-        e.preventDefault();
-        handleStart(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-
-    container.addEventListener('touchmove', e => {
-        e.preventDefault();
-        handleMove(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-
-    container.addEventListener('touchend', e => {
-        e.preventDefault();
-        // changedTouches required for touchend
-        handleEnd(e.changedTouches[0].clientY);
-    }, { passive: false });
-
+    container.addEventListener('touchstart', e => { e.preventDefault(); handleStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    container.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    container.addEventListener('touchend', e => { e.preventDefault(); handleEnd(e.changedTouches[0].clientY); }, { passive: false });
 
     function updateTrajectory(p, v) {
         let tp = p.clone(), tv = v.clone(), pts = [];
@@ -224,7 +266,7 @@ window.initDartsGame = function (container) {
     }
 
     function animate() {
-        requestAnimationFrame(animate);
+        window.dartAnimId = requestAnimationFrame(animate);
         if (state.phase === 'flying' || state.phase === 'landed') {
             if (state.phase === 'flying') {
                 phys.pos.add(phys.vel); phys.vel.add(phys.grav); phys.vel.multiplyScalar(0.998);
@@ -233,7 +275,6 @@ window.initDartsGame = function (container) {
                 if (phys.pos.z <= 0.2) hitDetails();
                 else if (phys.pos.y < -10) { state.phase = 'landed'; showMsg("OOPS"); setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 1000); }
             }
-            // Zoom
             const camTarget = new THREE.Vector3(dartPivot.position.x * 0.5, dartPivot.position.y * 0.5, dartPivot.position.z + 15);
             if (camTarget.z < 15) camTarget.z = 15;
             camera.position.lerp(camTarget, 0.05);
