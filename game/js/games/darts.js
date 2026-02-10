@@ -1,14 +1,14 @@
 /* ============================================ 
-   Physics Darts 9.0 (Camera Zoom & Accurate Scoring)
+   Physics Darts 10.0 (Mobile Touch Fix)
    Features: 
-   - Camera Follows Dart
-   - Accurate Angle/Ring Scoring
+   - Mobile Touch Events (Start/Move/End)
+   - Touch-Action: None (Prevents Scroll)
+   - Camera Zoom & Accurate Scoring
    - Native Forward Geometry (-Z)
-   - Cafe Environment
    ============================================ */
 
 window.initDartsGame = function (container) {
-    console.log("Dart Game Initialized - v9 (Zoom + Score Fix)");
+    console.log("Dart Game Initialized - v10 (Mobile Fix)");
 
     container.innerHTML = `
         <div id="darts-overlay" style="position:absolute; inset:0; pointer-events:none; z-index:10; font-family:'Outfit', sans-serif;">
@@ -29,7 +29,7 @@ window.initDartsGame = function (container) {
                 background: linear-gradient(to bottom, #fff, #bbb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
                 transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div>
         </div>
-        <div id="canvas-container" style="width:100%; height:100%; cursor:grab; background:#050505;"></div>
+        <div id="canvas-container" style="width:100%; height:100%; cursor:grab; background:#050505; touch-action: none;"></div>
     `;
 
     const canvasContainer = document.getElementById('canvas-container');
@@ -42,7 +42,6 @@ window.initDartsGame = function (container) {
     scene.fog = new THREE.Fog(0x050302, 20, 100);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
-    // Base camera pos
     const CAM_START = new THREE.Vector3(0, 0, 55);
     camera.position.copy(CAM_START);
 
@@ -134,32 +133,33 @@ window.initDartsGame = function (container) {
         dartPivot.position.set(2, -3, 45);
         dartPivot.rotation.set(0, 0, 0);
         dartModel.rotation.set(0.1, 0, 0);
-
-        // RESET CAMERA
         camera.position.copy(CAM_START);
         camera.lookAt(0, 0, 0);
-
         trajLine.visible = false; container.style.cursor = "grab";
     }
     resetTurn();
 
+    // INPUT LOGIC
     let dragStart = { x: 0, y: 0 };
-    container.addEventListener('mousedown', e => {
-        if (state.phase !== 'idle') return; state.phase = 'aiming'; dragStart = { x: e.clientX, y: e.clientY };
-        trajLine.visible = true; container.style.cursor = "grabbing"; document.getElementById('aim-hint').style.opacity = '0';
-    });
 
-    container.addEventListener('mousemove', e => {
+    function handleStart(x, y) {
+        if (state.phase !== 'idle') return;
+        state.phase = 'aiming';
+        dragStart = { x: x, y: y };
+        trajLine.visible = true;
+        container.style.cursor = "grabbing";
+        document.getElementById('aim-hint').style.opacity = '0';
+    }
+
+    function handleMove(x, y) {
         if (state.phase === 'idle' || state.phase === 'aiming') {
-            // Parallax only in Aim/Idle
-            const mx = (e.clientX / window.innerWidth) * 2 - 1, my = -(e.clientY / window.innerHeight) * 2 + 1;
+            const mx = (x / window.innerWidth) * 2 - 1, my = -(y / window.innerHeight) * 2 + 1;
             camera.position.x = mx * 2; camera.position.y = my * 2; camera.position.z = 55;
             camera.lookAt(0, 0, 0);
         }
-
         if (state.phase === 'aiming') {
-            const dx = e.clientX - dragStart.x;
-            const dy = e.clientY - dragStart.y;
+            const dx = x - dragStart.x;
+            const dy = y - dragStart.y;
             const pull = Math.min(Math.max(dy, 0), 400) / 400;
 
             dartPivot.position.z = 45 + (pull * 10);
@@ -174,13 +174,37 @@ window.initDartsGame = function (container) {
             state.vel = vel;
             updateTrajectory(dartPivot.position, vel);
         }
-    });
+    }
 
-    container.addEventListener('mouseup', e => {
+    function handleEnd(currentY) {
         if (state.phase !== 'aiming') return;
-        if ((e.clientY - dragStart.y) < 20) { resetTurn(); return; }
+        // Check throw or cancel
+        if ((currentY - dragStart.y) < 20) { resetTurn(); return; }
         throwDart();
-    });
+    }
+
+    // MOUSE EVENTS
+    container.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+    container.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+    container.addEventListener('mouseup', e => handleEnd(e.clientY));
+
+    // TOUCH EVENTS (Passive: false required to use preventDefault)
+    container.addEventListener('touchstart', e => {
+        e.preventDefault();
+        handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    container.addEventListener('touchmove', e => {
+        e.preventDefault();
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    container.addEventListener('touchend', e => {
+        e.preventDefault();
+        // changedTouches required for touchend
+        handleEnd(e.changedTouches[0].clientY);
+    }, { passive: false });
+
 
     function updateTrajectory(p, v) {
         let tp = p.clone(), tv = v.clone(), pts = [];
@@ -193,7 +217,6 @@ window.initDartsGame = function (container) {
         if (typeof audioManager !== 'undefined') audioManager.playPop();
         phys.pos.copy(dartPivot.position);
 
-        // Vel
         let vel = new THREE.Vector3(0, 0, -state.power).applyEuler(dartPivot.rotation);
         let pf = (state.power - 0.6) / 1.6;
         vel.y += 0.25 * (1 - Math.sqrt(Math.max(0, pf)));
@@ -207,27 +230,14 @@ window.initDartsGame = function (container) {
                 phys.pos.add(phys.vel); phys.vel.add(phys.grav); phys.vel.multiplyScalar(0.998);
                 dartPivot.position.copy(phys.pos);
                 dartPivot.lookAt(phys.pos.clone().sub(phys.vel));
-
                 if (phys.pos.z <= 0.2) hitDetails();
                 else if (phys.pos.y < -10) { state.phase = 'landed'; showMsg("OOPS"); setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 1000); }
             }
-
-            // CAMERA FOLLOW / ZOOM
-            // Target: slightly behind the dart, looking at board.
-            // Dart Z goes 45 -> 0.
-            // We want Cam Z 55 -> 20.
-            // Let's Lerp camera towards Target(0,0,20)
-            const camTarget = new THREE.Vector3(
-                dartPivot.position.x * 0.5,
-                dartPivot.position.y * 0.5,
-                dartPivot.position.z + 15
-            );
-
-            // Cap minimum Z
+            // Zoom
+            const camTarget = new THREE.Vector3(dartPivot.position.x * 0.5, dartPivot.position.y * 0.5, dartPivot.position.z + 15);
             if (camTarget.z < 15) camTarget.z = 15;
-
             camera.position.lerp(camTarget, 0.05);
-            camera.lookAt(dartPivot.position.x * 0.2, dartPivot.position.y * 0.2, 0); // Look near center
+            camera.lookAt(dartPivot.position.x * 0.2, dartPivot.position.y * 0.2, 0);
         }
         renderer.render(scene, camera);
     }
@@ -235,70 +245,20 @@ window.initDartsGame = function (container) {
     function hitDetails() {
         state.phase = 'landed'; phys.vel.set(0, 0, 0); dartPivot.position.z = 0.2;
         if (typeof audioManager !== 'undefined') audioManager.playCardFlip();
-
-        const dx = dartPivot.position.x;
-        const dy = dartPivot.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
+        const dx = dartPivot.position.x, dy = dartPivot.position.y, dist = Math.sqrt(dx * dx + dy * dy);
         let s = 0, t = "MISS";
-
-        // SCORING LOGIC (10 Units radius = 500px)
-        // 0-0.5 Unit = Bullseye (2.5% Radius)
-        // 0.5-1.2 Unit = Bull (6% Radius)
-        // 3.8-4.2 = Triple
-        // 7.2-7.6 = Double
-
-        if (dist > 7.7) {
-            s = 0; t = "MISS";
-        } else if (dist < 0.5) {
-            s = 50; t = "BULLSEYE";
-        } else if (dist < 1.2) {
-            s = 25; t = "BULL";
-        } else {
-            // Angle
-            let theta = Math.atan2(dx, dy);
-            // atan2(x, y) = 0 at +Y (Clockwise? No. Standard Math is CCW from +X. But swapped x,y uses North as 0. 
-            // Texture: 20 is at Top (+Y). 
-            // atan2(dx, dy): 
-            // if dx=0, dy=1 -> atan2=0. Correct (North).
-            // if dx=1, dy=0 -> atan2=PI/2. Correct (East -> 1 is East? No 1 is North Eastish? 
-            // Numbers: 20, 1, 18, 4... Clockwise.
-            // atan2(dx, dy) returns +Angle for +X (East).
-            // Wait. We need to check coordinate system magnitude.
-            // Standard: +Y Up, +X Right.
-            // Numbers go Clockwise.
-            // 20 is at 12 o'clock. 
-            // 1 is at 18 degrees (PI/10).
-            // atan2(x, y):
-            // (0,1) -> 0.
-            // (1,0) -> PI/2.
-            // So this gives Clockwise Angle from North? YES.
-
-            if (theta < 0) theta += Math.PI * 2;
-
-            // 20 slices -> PI/10 per slice.
-            // Index 0 is centered at 0. Range -PI/20 to +PI/20.
-            // So we need to shift or round.
-            // round(theta / sliceWidth) should work.
-
-            const sliceAngle = Math.PI / 10;
-            const sliceIdx = Math.round(theta / sliceAngle) % 20;
-
+        if (dist > 7.7) { s = 0; t = "MISS"; }
+        else if (dist < 0.5) { s = 50; t = "BULLSEYE"; }
+        else if (dist < 1.2) { s = 25; t = "BULL"; }
+        else {
+            let theta = Math.atan2(dx, dy); if (theta < 0) theta += Math.PI * 2;
+            const sliceIdx = Math.round(theta / (Math.PI / 10)) % 20;
             const numbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
             const baseScore = numbers[sliceIdx];
-
-            if (dist > 3.8 && dist < 4.2) {
-                s = baseScore * 3;
-                t = `TRIPLE ${baseScore}`;
-            } else if (dist > 7.2 && dist < 7.6) {
-                s = baseScore * 2;
-                t = `DOUBLE ${baseScore}`;
-            } else {
-                s = baseScore;
-                t = baseScore.toString();
-            }
+            if (dist > 3.8 && dist < 4.2) { s = baseScore * 3; t = `TRIPLE ${baseScore}`; }
+            else if (dist > 7.2 && dist < 7.6) { s = baseScore * 2; t = `DOUBLE ${baseScore}`; }
+            else { s = baseScore; t = baseScore.toString(); }
         }
-
         state.score += s; overlayScore.textContent = state.score; showMsg(t);
         setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 2000);
     }
