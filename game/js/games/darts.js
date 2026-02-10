@@ -1,16 +1,15 @@
 /* ============================================ 
-   Physics Darts 6.0 (Cafe Edition)
+   Physics Darts 9.0 (Camera Zoom & Accurate Scoring)
    Features: 
-   - Sports Cafe Environment (Wood, Bricks)
-   - Atmospheric Lighting
-   - 3D Lamp Fixture
-   - Professional Physics
+   - Camera Follows Dart
+   - Accurate Angle/Ring Scoring
+   - Native Forward Geometry (-Z)
+   - Cafe Environment
    ============================================ */
 
 window.initDartsGame = function (container) {
-    console.log("Dart Game Initialized - v6 (Cafe Atmosphere)");
+    console.log("Dart Game Initialized - v9 (Zoom + Score Fix)");
 
-    // UI Overlay
     container.innerHTML = `
         <div id="darts-overlay" style="position:absolute; inset:0; pointer-events:none; z-index:10; font-family:'Outfit', sans-serif;">
             <div style="position:absolute; top:20px; right:20px; text-align:right; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.8);">
@@ -22,11 +21,9 @@ window.initDartsGame = function (container) {
                 <span class="d-icon" style="font-size:28px; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transition:opacity 0.3s;">🚀</span>
                 <span class="d-icon" style="font-size:28px; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transition:opacity 0.3s;">🚀</span>
             </div>
-            
-            <div id="aim-hint" style="position:absolute; bottom:100px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.4); font-size:14px; text-align:center; text-shadow:0 1px 2px black;">
+            <div id="aim-hint" style="position:absolute; bottom:15%; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.4); font-size:14px; text-align:center; text-shadow:0 1px 2px black;">
                 👇 Çekip Bırakarak Nişan Al
             </div>
-
             <div id="tk-msg" style="position:absolute; top:40%; left:50%; transform:translate(-50%,-50%) scale(0); color:white; font-size:56px; font-weight:900; 
                 text-shadow:0 4px 15px rgba(0,0,0,0.6); white-space:nowrap;
                 background: linear-gradient(to bottom, #fff, #bbb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
@@ -39,432 +36,277 @@ window.initDartsGame = function (container) {
     const overlayScore = document.getElementById('tk-score');
     const overlayMsg = document.getElementById('tk-msg');
 
-    // --- SCENE SETUP ---
+    // SCENE
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x100805); // Very Dark Brown/Black
-    scene.fog = new THREE.Fog(0x100805, 20, 90);
+    scene.background = new THREE.Color(0x050302);
+    scene.fog = new THREE.Fog(0x050302, 20, 100);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
-    camera.position.set(0, 0, 55);
+    // Base camera pos
+    const CAM_START = new THREE.Vector3(0, 0, 55);
+    camera.position.copy(CAM_START);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
+    renderer.toneMapping = THREE.ReinhardToneMapping;
+    renderer.toneMappingExposure = 1.2;
     canvasContainer.appendChild(renderer.domElement);
 
-    // --- PROCEDURAL TEXTURES ---
+    // TEXTURES
     function createWoodTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512; canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Base
-        ctx.fillStyle = '#3e2723';
-        ctx.fillRect(0, 0, 512, 512);
-
-        // Planks
-        ctx.strokeStyle = '#281815';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        for (let i = 0; i < 512; i += 64) {
-            ctx.moveTo(0, i); ctx.lineTo(512, i); // Horizontal lines for floor planks
-            // Random vertical separations
-            for (let j = 0; j < 512; j += 128) {
-                if (Math.random() > 0.3) {
-                    let off = (Math.random() * 20) - 10;
-                    ctx.moveTo(j + off, i); ctx.lineTo(j + off, i + 64);
-                }
-            }
-        }
-        ctx.stroke();
-
-        // Grain Noise
-        for (let k = 0; k < 5000; k++) {
-            ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
-            ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 40);
-        }
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(8, 8);
-        return tex;
+        const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d');
+        x.fillStyle = '#3e2723'; x.fillRect(0, 0, 512, 512);
+        x.strokeStyle = '#281815'; x.lineWidth = 3; x.beginPath();
+        for (let i = 0; i < 512; i += 64) { x.moveTo(0, i); x.lineTo(512, i); for (let j = 0; j < 512; j += 128) if (Math.random() > 0.3) { let o = (Math.random() * 20) - 10; x.moveTo(j + o, i); x.lineTo(j + o, i + 64); } } x.stroke();
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(8, 8); return t;
     }
-
     function createBrickTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512; canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Mortar
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, 512, 512);
-
-        // Bricks
-        const rows = 16;
-        const cols = 8;
-        const bH = 512 / rows;
-        const bW = 512 / cols;
-
-        for (let y = 0; y < rows; y++) {
-            const offset = (y % 2) * (bW / 2);
-            for (let x = 0; x < cols; x++) {
-                ctx.fillStyle = Math.random() > 0.5 ? '#5d4037' : '#4e342e'; // Dark varieties
-                // Add noise color
-                if (Math.random() > 0.8) ctx.fillStyle = '#3e2723';
-
-                let px = x * bW - offset;
-                let py = y * bH;
-
-                if (px < -bW) px += 512 + bW; // wrap fix not perfect but ok
-
-                ctx.fillRect(px + 2, py + 2, bW - 4, bH - 4);
-            }
-        }
-        // Grime overlay
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(0, 0, 512, 512);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(4, 4);
-        return tex;
+        const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d');
+        x.fillStyle = '#222'; x.fillRect(0, 0, 512, 512);
+        const r = 16, cl = 8, bh = 512 / r, bw = 512 / cl;
+        for (let y = 0; y < r; y++) { const o = (y % 2) * (bw / 2); for (let i = 0; i < cl; i++) { x.fillStyle = Math.random() > 0.5 ? '#5d4037' : '#4e342e'; let px = i * bw - o; if (px < -bw) px += 512 + bw; x.fillRect(px + 2, y * bh + 2, bw - 4, bh - 4); } }
+        x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(0, 0, 512, 512);
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 4); return t;
     }
 
-    // --- ENVIRONMENT ---
+    // ENV
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.8 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -10; floor.receiveShadow = true; scene.add(floor);
 
-    // 1. Floor
-    const floorMat = new THREE.MeshStandardMaterial({
-        map: createWoodTexture(),
-        roughness: 0.8,
-        color: 0x888888
-    });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -10;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(100, 80), new THREE.MeshStandardMaterial({ map: createBrickTexture(), roughness: 0.9 }));
+    wall.position.z = -2; wall.position.y = 10; wall.receiveShadow = true; scene.add(wall);
 
-    // 2. Wall
-    const wallMat = new THREE.MeshStandardMaterial({
-        map: createBrickTexture(),
-        roughness: 0.9,
-        normalScale: new THREE.Vector2(1, 1), // fake
-        color: 0x555555
-    });
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(100, 80), wallMat);
-    wall.position.z = -2;
-    wall.position.y = 10;
-    wall.receiveShadow = true;
-    scene.add(wall);
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(12, 20), new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 1 }));
+    rug.rotation.x = -Math.PI / 2; rug.position.set(0, -9.9, 45); rug.receiveShadow = true; scene.add(rug);
 
-    // 3. Rug (Oche)
-    const rugGeo = new THREE.PlaneGeometry(12, 20);
-    const rugMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 1 });
-    const rug = new THREE.Mesh(rugGeo, rugMat);
-    rug.rotation.x = -Math.PI / 2;
-    rug.position.set(0, -9.9, 45); // Player pos
-    rug.receiveShadow = true;
-    scene.add(rug);
+    // LAMP
+    const lampGroup = new THREE.Group(); lampGroup.position.set(0, 15, 12); scene.add(lampGroup);
+    lampGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 15), new THREE.MeshStandardMaterial({ color: 0x111 })).translateY(7.5));
+    const pts = [new THREE.Vector2(0, 0), new THREE.Vector2(1, 0.2), new THREE.Vector2(2.5, 1), new THREE.Vector2(3, 2.5), new THREE.Vector2(0.3, 2.5), new THREE.Vector2(0.3, 3), new THREE.Vector2(0, 3)];
+    const shade = new THREE.Mesh(new THREE.LatheGeometry(pts, 32), new THREE.MeshStandardMaterial({ color: 0x212121, side: THREE.DoubleSide })); shade.rotation.x = Math.PI; lampGroup.add(shade);
+    lampGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.6), new THREE.MeshBasicMaterial({ color: 0xffaa00 })).translateY(-1));
+    const vol = new THREE.Mesh(new THREE.ConeGeometry(5, 15, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.08, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); vol.position.y = -7.5; lampGroup.add(vol);
 
-    // Line mark
-    const lineGeo = new THREE.PlaneGeometry(10, 0.5);
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const line = new THREE.Mesh(lineGeo, lineMat);
-    line.rotation.x = -Math.PI / 2;
-    line.position.set(0, -9.8, 30); // Throw line limit?
-    scene.add(line);
+    // LIGHTS
+    scene.add(new THREE.AmbientLight(0xffae00, 0.15));
+    const spot = new THREE.SpotLight(0xffb74d, 2.5); spot.position.set(0, 15, 12); spot.target.position.set(0, 0, 0);
+    spot.castShadow = true; spot.angle = 0.6; spot.penumbra = 0.8; spot.decay = 2; spot.distance = 80; scene.add(spot); scene.add(spot.target);
 
-    // 4. LAMP FIXTURE
-    const lampGroup = new THREE.Group();
-    lampGroup.position.set(0, 18, 15); // Above and in front
-
-    // Cord
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 10), new THREE.MeshBasicMaterial({ color: 0x111 }));
-    cord.position.y = 5;
-    lampGroup.add(cord);
-
-    // Shade
-    const shadeGeo = new THREE.ConeGeometry(3, 2, 32, 1, true);
-    const shadeMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, side: THREE.DoubleSide, metalness: 0.3 });
-    const shade = new THREE.Mesh(shadeGeo, shadeMat);
-    shade.position.y = 0;
-    lampGroup.add(shade);
-
-    // Bulb Glow
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
-    bulb.position.y = -0.5;
-    lampGroup.add(bulb);
-
-    scene.add(lampGroup);
-
-    // --- LIGHTING OVERHAUL ---
-    const ambientLight = new THREE.AmbientLight(0xffae00, 0.1); // Very dim orange
-    scene.add(ambientLight);
-
-    // Main Spot (The lamp)
-    const spotLight = new THREE.SpotLight(0xffbd5b, 2.0);
-    spotLight.position.set(0, 17.5, 15);
-    spotLight.target.position.set(0, 0, 0); // Aim at board center
-    spotLight.castShadow = true;
-    spotLight.angle = 0.5; // Narrow cone
-    spotLight.penumbra = 0.5; // Soft edges
-    spotLight.distance = 100;
-    spotLight.decay = 2;
-    spotLight.shadow.bias = -0.0001;
-    scene.add(spotLight);
-    scene.add(spotLight.target);
-
-    // Board Rim Light (cool contrast)
-    const rimLight = new THREE.PointLight(0x445588, 0.5, 20);
-    rimLight.position.set(-8, -5, -1);
-    scene.add(rimLight);
-
-    // --- BOARD TEXTURE & OBJECTS (Reuse previous logic) ---
-    // ... Copying createDartboardTexture logic ...
-    function createDartboardTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024; canvas.height = 1024;
-        const ctx = canvas.getContext('2d');
-        const cx = 512, cy = 512;
-
-        ctx.fillStyle = '#111'; ctx.fillRect(0, 0, 1024, 1024);
-        ctx.beginPath(); ctx.arc(cx, cy, 500, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
-
-        const numbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-        const sliceAngle = (Math.PI * 2) / 20;
-
+    // BOARD
+    function createBoardTex() {
+        const c = document.createElement('canvas'); c.width = 1024; c.height = 1024; const x = c.getContext('2d'); const cx = 512, cy = 512;
+        x.fillStyle = '#111'; x.fillRect(0, 0, 1024, 1024); x.beginPath(); x.arc(cx, cy, 500, 0, Math.PI * 2); x.fillStyle = '#000'; x.fill();
+        const nums = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5], sa = (Math.PI * 2) / 20;
         for (let i = 0; i < 20; i++) {
-            const angle = (i * sliceAngle) - (Math.PI / 2) - (sliceAngle / 2);
-            const isAlt = i % 2 === 0;
-            const cSingle = isAlt ? '#111' : '#e0cda8'; // Darker beige
-            const cRing = isAlt ? '#c62828' : '#2e7d32'; // Darker red/green
-
-            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 380, angle, angle + sliceAngle); ctx.fillStyle = cSingle; ctx.fill();
-            ctx.beginPath(); ctx.arc(cx, cy, 380, angle, angle + sliceAngle); ctx.arc(cx, cy, 360, angle + sliceAngle, angle, true); ctx.fillStyle = cRing; ctx.fill();
-            ctx.beginPath(); ctx.arc(cx, cy, 210, angle, angle + sliceAngle); ctx.arc(cx, cy, 190, angle + sliceAngle, angle, true); ctx.fillStyle = cRing; ctx.fill();
-
-            ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle + sliceAngle / 2);
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 60px "Nunito"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(numbers[i].toString(), 440, 0); ctx.restore();
+            const a = (i * sa) - (Math.PI / 2) - (sa / 2); const alt = i % 2 == 0;
+            x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, 380, a, a + sa); x.fillStyle = alt ? '#111' : '#e0cda8'; x.fill();
+            x.beginPath(); x.arc(cx, cy, 380, a, a + sa); x.arc(cx, cy, 360, a + sa, a, true); x.fillStyle = alt ? '#c62828' : '#2e7d32'; x.fill();
+            x.beginPath(); x.arc(cx, cy, 210, a, a + sa); x.arc(cx, cy, 190, a + sa, a, true); x.fillStyle = alt ? '#c62828' : '#2e7d32'; x.fill();
+            x.save(); x.translate(cx, cy); x.rotate(a + sa / 2); x.fillStyle = '#fff'; x.font = 'bold 60px "Nunito"'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(nums[i].toString(), 440, 0); x.restore();
         }
-
-        ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.fillStyle = '#2e7d32'; ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, 25, 0, Math.PI * 2); ctx.fillStyle = '#c62828'; ctx.fill();
-        return new THREE.CanvasTexture(canvas);
+        x.beginPath(); x.arc(cx, cy, 60, 0, Math.PI * 2); x.fillStyle = '#2e7d32'; x.fill(); x.beginPath(); x.arc(cx, cy, 25, 0, Math.PI * 2); x.fillStyle = '#c62828'; x.fill(); return new THREE.CanvasTexture(c);
     }
+    const board = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 0.5, 64), new THREE.MeshStandardMaterial({ map: createBoardTex(), roughness: 0.5 }));
+    board.rotation.x = Math.PI / 2; board.receiveShadow = true; scene.add(board);
 
-    const boardMat = new THREE.MeshStandardMaterial({ map: createDartboardTexture(), roughness: 0.5, metalness: 0.0 });
-    const board = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 0.5, 64), boardMat);
-    board.rotation.x = Math.PI / 2;
-    board.receiveShadow = true;
-    scene.add(board);
-
-    // Shadow catcher behind board
-    const boardShadow = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), new THREE.ShadowMaterial({ opacity: 0.6 }));
-    boardShadow.position.z = -1.9;
-    boardShadow.receiveShadow = true;
-    scene.add(boardShadow);
-
-
-    // --- DART MODEL (Reuse V5 Fixed) ---
+    // DART
     const dartPivot = new THREE.Group(); scene.add(dartPivot);
     const dartModel = new THREE.Group();
-
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x888, metalness: 1 }));
-    tip.rotation.x = -Math.PI / 2; tip.position.z = -2.5; dartModel.add(tip);
-
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 2.5, 12), new THREE.MeshStandardMaterial({ color: 0x333, metalness: 0.8, roughness: 0.4 }));
-    barrel.rotation.x = -Math.PI / 2; barrel.position.z = -0.5; dartModel.add(barrel);
-
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2, 8), new THREE.MeshStandardMaterial({ color: 0xeee }));
-    shaft.rotation.x = -Math.PI / 2; shaft.position.z = 1.75; dartModel.add(shaft);
-
-    const flightGeo = new THREE.BoxGeometry(0.02, 1.5, 1.8);
-    const flightMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, transparent: true, opacity: 0.95 });
-    const f1 = new THREE.Mesh(flightGeo, flightMat); f1.position.z = 2.8; dartModel.add(f1);
-    const f2 = new THREE.Mesh(flightGeo, flightMat); f2.rotation.z = Math.PI / 2; f2.position.z = 2.8; dartModel.add(f2);
-
-    dartModel.rotation.y = Math.PI; // Correct orientation
+    // Tip -Z
+    dartModel.add(new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x999, metalness: 1 })).rotateX(-Math.PI / 2).translateZ(-2.5));
+    dartModel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 2.5, 12), new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.4 })).rotateX(-Math.PI / 2).translateZ(-0.5));
+    dartModel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2, 8), new THREE.MeshStandardMaterial({ color: 0xeee })).rotateX(-Math.PI / 2).translateZ(1.75));
+    const fMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }); const fGeo = new THREE.BoxGeometry(0.02, 1.5, 1.8);
+    dartModel.add(new THREE.Mesh(fGeo, fMat).translateZ(2.8)); dartModel.add(new THREE.Mesh(fGeo, fMat).rotateZ(Math.PI / 2).translateZ(2.8));
     dartPivot.add(dartModel);
 
-    // Trajectory
-    const trajPoints = Array(30).fill().map(() => new THREE.Vector3());
-    const trajLine = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(trajPoints),
-        new THREE.LineBasicMaterial({ color: 0xffaa00, opacity: 0.3, transparent: true }) // Orange trace
-    );
-    scene.add(trajLine);
-
-    // --- LOGIC (Reuse V9 Physics) ---
-    let state = { phase: 'idle', score: 0, darts: 3, power: 0 };
+    // LOGIC
+    const trajLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array(30).fill().map(() => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: 0xffaa00, opacity: 0.4, transparent: true })); scene.add(trajLine);
+    let state = { phase: 'idle', score: 0, darts: 3, power: 0, vel: new THREE.Vector3() };
     let phys = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), grav: new THREE.Vector3(0, -0.02, 0) };
 
     function resetTurn() {
         if (state.darts <= 0) return;
         state.phase = 'idle';
-        dartPivot.position.set(2, -3, 45); // Far back
+        dartPivot.position.set(2, -3, 45);
         dartPivot.rotation.set(0, 0, 0);
-        dartModel.rotation.set(0.1, Math.PI, 0); // Keep flipped Y + tilt
-        trajLine.visible = false;
-        canvasContainer.style.cursor = "grab";
+        dartModel.rotation.set(0.1, 0, 0);
+
+        // RESET CAMERA
+        camera.position.copy(CAM_START);
+        camera.lookAt(0, 0, 0);
+
+        trajLine.visible = false; container.style.cursor = "grab";
     }
     resetTurn();
 
     let dragStart = { x: 0, y: 0 };
-    canvasContainer.addEventListener('mousedown', (e) => {
-        if (state.phase !== 'idle') return;
-        state.phase = 'aiming';
-        dragStart.x = e.clientX;
-        dragStart.y = e.clientY;
-        trajLine.visible = true;
-        canvasContainer.style.cursor = "grabbing";
-        document.getElementById('aim-hint').style.opacity = '0';
+    container.addEventListener('mousedown', e => {
+        if (state.phase !== 'idle') return; state.phase = 'aiming'; dragStart = { x: e.clientX, y: e.clientY };
+        trajLine.visible = true; container.style.cursor = "grabbing"; document.getElementById('aim-hint').style.opacity = '0';
     });
 
-    canvasContainer.addEventListener('mousemove', (e) => {
-        const mx = (e.clientX / window.innerWidth) * 2 - 1;
-        const my = -(e.clientY / window.innerHeight) * 2 + 1;
-
-        // Cam Parallax
-        camera.position.x = mx * 2;
-        camera.position.y = my * 2;
-        camera.lookAt(0, 0, 0);
+    container.addEventListener('mousemove', e => {
+        if (state.phase === 'idle' || state.phase === 'aiming') {
+            // Parallax only in Aim/Idle
+            const mx = (e.clientX / window.innerWidth) * 2 - 1, my = -(e.clientY / window.innerHeight) * 2 + 1;
+            camera.position.x = mx * 2; camera.position.y = my * 2; camera.position.z = 55;
+            camera.lookAt(0, 0, 0);
+        }
 
         if (state.phase === 'aiming') {
             const dx = e.clientX - dragStart.x;
             const dy = e.clientY - dragStart.y;
-            const pullFactor = Math.min(Math.max(dy, 0), 400) / 400;
+            const pull = Math.min(Math.max(dy, 0), 400) / 400;
 
-            dartPivot.position.z = 45 + (pullFactor * 10);
-            dartPivot.position.y = -3 - (pullFactor * 2);
+            dartPivot.position.z = 45 + (pull * 10);
+            dartPivot.position.y = -3 - (pull * 2);
             dartPivot.rotation.y = -(dx * 0.004);
-            dartPivot.rotation.x = (pullFactor * 0.3);
+            dartPivot.rotation.x = (pull * 0.3);
 
-            // Power V2
-            const power = 0.6 + Math.pow(pullFactor, 2) * 1.6;
-            const vel = new THREE.Vector3(0, 0, -power).applyEuler(dartPivot.rotation);
-            vel.y += 0.25 * (1 - pullFactor);
-
-            updateTrajectory(dartPivot.position, vel);
+            const power = 0.6 + Math.pow(pull, 2) * 1.6;
             state.power = power;
+            const vel = new THREE.Vector3(0, 0, -power).applyEuler(dartPivot.rotation);
+            vel.y += 0.25 * (1 - pull);
+            state.vel = vel;
+            updateTrajectory(dartPivot.position, vel);
         }
     });
 
-    canvasContainer.addEventListener('mouseup', (e) => {
+    container.addEventListener('mouseup', e => {
         if (state.phase !== 'aiming') return;
-        const dy = e.clientY - dragStart.y;
-        if (dy < 20) { resetTurn(); return; }
+        if ((e.clientY - dragStart.y) < 20) { resetTurn(); return; }
         throwDart();
     });
 
-    function updateTrajectory(start, vel) {
-        const p = start.clone();
-        const v = vel.clone();
-        const pts = [];
-        for (let i = 0; i < 30; i++) {
-            pts.push(p.clone());
-            p.add(v);
-            v.add(phys.grav);
-            if (p.z < 0) break;
-        }
+    function updateTrajectory(p, v) {
+        let tp = p.clone(), tv = v.clone(), pts = [];
+        for (let i = 0; i < 30; i++) { pts.push(tp.clone()); tp.add(tv); tv.add(phys.grav); if (tp.z < 0) break; }
         trajLine.geometry.setFromPoints(pts);
     }
 
     function throwDart() {
-        state.phase = 'flying';
-        trajLine.visible = false;
-        state.darts--;
-        updateIcons();
+        state.phase = 'flying'; trajLine.visible = false; state.darts--; updateIcons();
         if (typeof audioManager !== 'undefined') audioManager.playPop();
-
         phys.pos.copy(dartPivot.position);
 
-        // Recalc vel to be safe
+        // Vel
         let vel = new THREE.Vector3(0, 0, -state.power).applyEuler(dartPivot.rotation);
-        // Pull factor approximation for lift
-        const pf = (state.power - 0.6) / 1.6;
+        let pf = (state.power - 0.6) / 1.6;
         vel.y += 0.25 * (1 - Math.sqrt(Math.max(0, pf)));
-
         phys.vel.copy(vel);
     }
 
     function animate() {
         requestAnimationFrame(animate);
-        if (state.phase === 'flying') {
-            phys.pos.add(phys.vel);
-            phys.vel.add(phys.grav);
-            phys.vel.multiplyScalar(0.998); // Less drag
-            dartPivot.position.copy(phys.pos);
+        if (state.phase === 'flying' || state.phase === 'landed') {
+            if (state.phase === 'flying') {
+                phys.pos.add(phys.vel); phys.vel.add(phys.grav); phys.vel.multiplyScalar(0.998);
+                dartPivot.position.copy(phys.pos);
+                dartPivot.lookAt(phys.pos.clone().sub(phys.vel));
 
-            const target = phys.pos.clone().sub(phys.vel);
-            dartPivot.lookAt(target);
+                if (phys.pos.z <= 0.2) hitDetails();
+                else if (phys.pos.y < -10) { state.phase = 'landed'; showMsg("OOPS"); setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 1000); }
+            }
 
-            if (phys.pos.z <= 0.2) hitDetails();
-            else if (phys.pos.y < -10) miss();
+            // CAMERA FOLLOW / ZOOM
+            // Target: slightly behind the dart, looking at board.
+            // Dart Z goes 45 -> 0.
+            // We want Cam Z 55 -> 20.
+            // Let's Lerp camera towards Target(0,0,20)
+            const camTarget = new THREE.Vector3(
+                dartPivot.position.x * 0.5,
+                dartPivot.position.y * 0.5,
+                dartPivot.position.z + 15
+            );
+
+            // Cap minimum Z
+            if (camTarget.z < 15) camTarget.z = 15;
+
+            camera.position.lerp(camTarget, 0.05);
+            camera.lookAt(dartPivot.position.x * 0.2, dartPivot.position.y * 0.2, 0); // Look near center
         }
         renderer.render(scene, camera);
     }
 
     function hitDetails() {
-        state.phase = 'landed'; measureScore();
-    }
-
-    function measureScore() {
-        phys.vel.set(0, 0, 0); dartPivot.position.z = 0.2;
+        state.phase = 'landed'; phys.vel.set(0, 0, 0); dartPivot.position.z = 0.2;
         if (typeof audioManager !== 'undefined') audioManager.playCardFlip();
 
         const dx = dartPivot.position.x;
         const dy = dartPivot.position.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
+
         let s = 0, t = "MISS";
 
-        // Scoring V6
-        if (dist > 10) { s = 0; t = "MISS"; }
-        else if (dist < 1.5) { s = 50; t = "BULLSEYE"; }
-        else if (dist < 3.2) { s = 25; t = "BULL"; }
-        else {
-            s = Math.floor(Math.random() * 20) + 1;
-            if (dist > 5 && dist < 6) { s *= 3; t = `TRIPLE ${s / 3}`; }
-            else if (dist > 9 && dist < 10) { s *= 2; t = `DOUBLE ${s / 2}`; }
-            else t = s.toString();
+        // SCORING LOGIC (10 Units radius = 500px)
+        // 0-0.5 Unit = Bullseye (2.5% Radius)
+        // 0.5-1.2 Unit = Bull (6% Radius)
+        // 3.8-4.2 = Triple
+        // 7.2-7.6 = Double
+
+        if (dist > 7.7) {
+            s = 0; t = "MISS";
+        } else if (dist < 0.5) {
+            s = 50; t = "BULLSEYE";
+        } else if (dist < 1.2) {
+            s = 25; t = "BULL";
+        } else {
+            // Angle
+            let theta = Math.atan2(dx, dy);
+            // atan2(x, y) = 0 at +Y (Clockwise? No. Standard Math is CCW from +X. But swapped x,y uses North as 0. 
+            // Texture: 20 is at Top (+Y). 
+            // atan2(dx, dy): 
+            // if dx=0, dy=1 -> atan2=0. Correct (North).
+            // if dx=1, dy=0 -> atan2=PI/2. Correct (East -> 1 is East? No 1 is North Eastish? 
+            // Numbers: 20, 1, 18, 4... Clockwise.
+            // atan2(dx, dy) returns +Angle for +X (East).
+            // Wait. We need to check coordinate system magnitude.
+            // Standard: +Y Up, +X Right.
+            // Numbers go Clockwise.
+            // 20 is at 12 o'clock. 
+            // 1 is at 18 degrees (PI/10).
+            // atan2(x, y):
+            // (0,1) -> 0.
+            // (1,0) -> PI/2.
+            // So this gives Clockwise Angle from North? YES.
+
+            if (theta < 0) theta += Math.PI * 2;
+
+            // 20 slices -> PI/10 per slice.
+            // Index 0 is centered at 0. Range -PI/20 to +PI/20.
+            // So we need to shift or round.
+            // round(theta / sliceWidth) should work.
+
+            const sliceAngle = Math.PI / 10;
+            const sliceIdx = Math.round(theta / sliceAngle) % 20;
+
+            const numbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+            const baseScore = numbers[sliceIdx];
+
+            if (dist > 3.8 && dist < 4.2) {
+                s = baseScore * 3;
+                t = `TRIPLE ${baseScore}`;
+            } else if (dist > 7.2 && dist < 7.6) {
+                s = baseScore * 2;
+                t = `DOUBLE ${baseScore}`;
+            } else {
+                s = baseScore;
+                t = baseScore.toString();
+            }
         }
 
-        state.score += s;
-        overlayScore.textContent = state.score;
-        showMsg(t);
+        state.score += s; overlayScore.textContent = state.score; showMsg(t);
         setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 2000);
     }
 
-    function miss() {
-        state.phase = 'landed'; showMsg("OOPS");
-        setTimeout(() => { if (state.darts > 0) resetTurn(); else gameOver(); }, 1000);
-    }
-
-    function showMsg(txt) {
-        overlayMsg.textContent = txt;
-        overlayMsg.style.transform = "translate(-50%,-50%) scale(1)";
-        setTimeout(() => overlayMsg.style.transform = "translate(-50%,-50%) scale(0)", 1500);
-    }
-
-    function updateIcons() {
-        document.querySelectorAll('.d-icon').forEach((icon, i) => icon.style.opacity = i < state.darts ? 1 : 0.2);
-    }
-
-    function gameOver() {
-        showMsg("GAME OVER");
-        setTimeout(() => { state.score = 0; state.darts = 3; overlayScore.textContent = "0"; updateIcons(); resetTurn(); }, 3000);
-    }
+    function showMsg(txt) { overlayMsg.textContent = txt; overlayMsg.style.transform = "translate(-50%,-50%) scale(1)"; setTimeout(() => overlayMsg.style.transform = "translate(-50%,-50%) scale(0)", 1500); }
+    function updateIcons() { document.querySelectorAll('.d-icon').forEach((x, i) => x.style.opacity = i < state.darts ? 1 : 0.2); }
+    function gameOver() { showMsg("GAME OVER"); setTimeout(() => { state.score = 0; state.darts = 3; overlayScore.textContent = "0"; updateIcons(); resetTurn(); }, 3000); }
 
     animate();
-    window.addEventListener('resize', () => {
-        camera.aspect = container.clientWidth / container.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(container.clientWidth, container.clientHeight);
-    });
+    window.addEventListener('resize', () => { camera.aspect = container.clientWidth / container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); });
 };
