@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>🦋 Flying Horses - Çocuk Oyunları</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Sparkle Effects -->
+        <div class="sparkles" id="sparkles"></div>
+
+        <!-- Main Menu -->
+        <div id="main-menu" class="screen active">
+            <div class="header">
+                <div class="logo-container">
+                    <div class="logo-icon">🦋</div>
+                    <h1 class="logo-text">Flying Horses</h1>
+                </div>
+                <p class="subtitle">Eğlenceli Oyunlar! 🌈</p>
+            </div>
+
+            <div class="games-grid">
+                <div class="game-card" data-game="coloring" onclick="openGame('coloring')">
+                    <div class="card-inner">
+                        <div class="card-icon">🎨</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Boyama</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="puzzle" onclick="openGame('puzzle')">
+                    <div class="card-inner">
+                        <div class="card-icon">🧩</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Puzzle</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="memory" onclick="openGame('memory')">
+                    <div class="card-inner">
+                        <div class="card-icon">🃏</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Hafıza</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="balloons" onclick="openGame('balloons')">
+                    <div class="card-inner">
+                        <div class="card-icon">🎈</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Balonlar</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="music" onclick="openGame('music')">
+                    <div class="card-inner">
+                        <div class="card-icon">🎵</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Müzik</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="runner" onclick="openGame('runner')">
+                    <div class="card-inner">
+                        <div class="card-icon">🐱</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Kedi Koşusu</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
+
+                <div class="game-card" data-game="shells" onclick="openGame('shells')">
+                    <div class="card-inner">
+                        <div class="card-icon">🎯</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Bul Karayı</span>
+                    <div class="card-stars">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+
+            <div class="floating-elements">
+                <div class="floating-item" style="--delay: 0s; --x: 10%;">🌟</div>
+                <div class="floating-item" style="--delay: 1s; --x: 30%;">💫</div>
+                <div class="floating-item" style="--delay: 2s; --x: 50%;">✨</div>
+                <div class="floating-item" style="--delay: 3s; --x: 70%;">🌈</div>
+                <div class="floating-item" style="--delay: 4s; --x: 90%;">🦄</div>
+            </div>
+        </div>
+
+        <!-- Game Container -->
+        <div id="game-container" class="screen">
+            <div class="game-header">
+                <button class="back-btn" onclick="goBack()">
+                    <span class="back-icon">←</span>
+                    <span class="back-text">Geri</span>
+                </button>
+                <div class="game-title" id="game-title">Oyun</div>
+                <div class="sound-btn" onclick="toggleSound()">
+                    <span id="sound-icon">🔊</span>
+                </div>
+            </div>
+            <div id="game-area"></div>
+        </div>
+
+        <!-- Celebration Overlay -->
+        <div id="celebration" class="celebration hidden">
+            <div class="celebration-content">
+                <div class="celebration-stars">⭐🌟⭐</div>
+                <h2 class="celebration-title">Harika! 🎉</h2>
+                <p class="celebration-text">Çok güzel yaptın!</p>
+                <button class="celebration-btn" onclick="closeCelebration()">Devam Et!</button>
+            </div>
+            <div class="confetti-container" id="confetti"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/games/coloring.js"></script>
+    <script src="js/games/puzzle.js"></script>
+    <script src="js/games/memory.js"></script>
+    <script src="js/games/balloons.js"></script>
+    <script src="js/games/music.js"></script>
+    <script src="js/games/runner.js"></script>
+    <script src="js/games/shells.js?v=4"></script>
+</body>
+
+</html>
