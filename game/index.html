@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/animations.css">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 
 <body>
@@ -90,6 +91,15 @@
                     <span class="card-title">Bul Karayı</span>
                     <div class="card-stars">⭐⭐⭐⭐⭐</div>
                 </div>
+
+                <div class="game-card" data-game="darts" onclick="openGame('darts')">
+                    <div class="card-inner">
+                        <div class="card-icon">🏹</div>
+                        <div class="card-shine"></div>
+                    </div>
+                    <span class="card-title">Dart Atışı</span>
+                    <div class="card-stars">⭐⭐⭐</div>
+                </div>
             </div>
 
             <div class="floating-elements">
@@ -138,6 +148,7 @@
     <script src="js/games/music.js"></script>
     <script src="js/games/runner.js"></script>
     <script src="js/games/shells.js?v=4"></script>
+    <script src="js/games/darts.js?v=10"></script>
 </body>
 
 </html>

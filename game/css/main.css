@@ -240,6 +240,10 @@ body {
     background: linear-gradient(145deg, #FFDAB9, #FFA07A);
 }
 
+.game-card[data-game="darts"] .card-inner {
+    background: linear-gradient(145deg, #2c3e50, #bdc3c7);
+}
+
 /* ============================================
    Floating Elements
    ============================================ */
