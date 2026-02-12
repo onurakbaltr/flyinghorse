@@ -244,6 +244,10 @@ body {
     background: linear-gradient(145deg, #2c3e50, #bdc3c7);
 }
 
+.game-card[data-game="cooking"] .card-inner {
+    background: linear-gradient(145deg, #FFCCBC, #FF7043);
+}
+
 /* ============================================
    Floating Elements
    ============================================ */

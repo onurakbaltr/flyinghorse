@@ -15,7 +15,8 @@ const gameTitles = {
     music: '🎵 Müzik Bahçesi',
     runner: '🐱 Kedi Koşusu',
     shells: '🎯 Bul Karayı',
-    darts: '🏹 Dart Atışı'
+    darts: '🏹 Dart Atışı',
+    cooking: '🍳 Yemek Pişir'
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,6 +49,7 @@ function openGame(gameName) {
             case 'runner': if (typeof initKittyRunnerGame === 'function') initKittyRunnerGame(gameArea); break;
             case 'shells': if (typeof initShellsGame === 'function') initShellsGame(gameArea); break;
             case 'darts': if (typeof initDartsGame === 'function') initDartsGame(gameArea); break;
+            case 'cooking': if (typeof initCookingGame === 'function') initCookingGame(gameArea); break;
         }
     }, 100);
 }
